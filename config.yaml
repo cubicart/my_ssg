@@ -1,0 +1,10 @@
+base_url: http://cubicart.ir
+theme: main
+
+
+
+app:
+  content: content
+  themes: themes
+  static: static
+  public: public
