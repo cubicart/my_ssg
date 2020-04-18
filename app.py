@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
-from typing import List
+import json
 import os
 import re
+import shutil
+from typing import List
 
 import jinja2
 import yaml
@@ -76,14 +78,7 @@ class App:
         self.config = config
         self.root: Folder = Folder(config['app']['content'])
         self.jinja = self._get_jinja()
-
-    def _get_jinja(self):
-        t_dir = os.path.join(self.config['app']['themes'],
-                             self.config['theme'], 'layouts')
-        return jinja2.Environment(loader=jinja2.FileSystemLoader(t_dir))
-
-    def build(self):
-        self._build(self.root, self.config['app']['public'])
+        self.data = self._data_files()
 
     @staticmethod
     def mkdir(*args):
@@ -92,15 +87,21 @@ class App:
             os.makedirs(path, exist_ok=True)
         return path
 
-    def _write(self, template, path, folder, page):
-        tpl = self.jinja.get_template(template)
-        with open(os.path.join(path, 'index.html'), 'w') as out:
-            out.write(tpl.render(
-                config=self.config,
-                root=self.root,
-                folder=folder,
-                page=page,
-            ))
+    def build(self):
+        if os.path.exists(self.config['app']['public']):
+            for x in os.scandir(self.config['app']['public']):
+                if x.is_dir():
+                    if x.name != '.git':
+                        shutil.rmtree(x.path)
+                else:
+                    os.unlink(x.path)
+        self._build(self.root, self.config['app']['public'])
+        self._copy_static_files()
+
+    def _get_jinja(self):
+        t_dir = os.path.join(self.config['app']['themes'],
+                             self.config['theme'], 'layouts')
+        return jinja2.Environment(loader=jinja2.FileSystemLoader(t_dir))
 
     def _build(self, folder: Folder, out_dir):
         if folder.is_index:
@@ -118,6 +119,43 @@ class App:
 
         for f in folder.folders:
             self._build(f, os.path.join(out_dir, f.name))
+
+    def _write(self, template, path, folder, page):
+        tpl = self.jinja.get_template(template)
+        with open(os.path.join(path, 'index.html'), 'w') as out:
+            out.write(tpl.render(
+                config=self.config,
+                root=self.root,
+                data=self.data,
+                folder=folder,
+                page=page,
+            ))
+
+    def _data_files(self):
+        data = {}
+        for x in os.scandir(self.config['app']['data']):
+            split = os.path.splitext(x.name)
+            if x.is_file() and split[1] == '.json':
+                with open(x.path, 'r') as f:
+                    data[split[0]] = json.load(f)
+        return data
+
+    def _copy_static_files(self):
+        def copy(src):
+            for x in os.scandir(src):
+                dst = os.path.join(self.config['app']['public'], x.name)
+                if x.is_file():
+                    shutil.copy(x.path, dst)
+                elif x.is_dir():
+                    shutil.copytree(x.path, dst)
+
+        if os.path.exists(self.config['app']['static']):
+            copy(self.config['app']['static'])
+
+        src = os.path.join(self.config['app']['themes'],
+                           self.config['theme'], 'static')
+        if os.path.exists(src):
+            copy(src)
 
 
 def main():

@@ -6,5 +6,6 @@ theme: main
 app:
   content: content
   themes: themes
+  data: data
   static: static
   public: public
