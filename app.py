@@ -90,9 +90,10 @@ class App:
     def build(self):
         if os.path.exists(self.config['app']['public']):
             for x in os.scandir(self.config['app']['public']):
-                if x.is_dir():
-                    if x.name != '.git':
-                        shutil.rmtree(x.path)
+                if x.name == '.git':
+                    continue
+                elif x.is_dir():
+                    shutil.rmtree(x.path)
                 else:
                     os.unlink(x.path)
         self._build(self.root, self.config['app']['public'])
